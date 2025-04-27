@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flashcard 📝</title>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.0/dist/jszip.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f9f9f9;
+      margin: 20px;
+      text-align: center;
+      position: relative;
+    }
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    #questionBox, #answerBox {
+      margin: 20px 0;
+      padding: 20px;
+      border-radius: 12px;
+    }
+    #questionBox {
+      background: #eef6fb;
+    }
+    #answerBox {
+      background: #d4edda;
+      display: none;
+    }
+    button {
+      margin: 5px;
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .easy { background: #4CAF50; color: white; }
+    .hard { background: #f44336; color: white; }
+    .show { background: #2196F3; color: white; }
+    .progress {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    .timer {
+      margin-top: 5px;
+      color: #555;
+    }
+
+    /* Language Toggle Simple */
+    .language-toggle {
+      position: absolute;
+      top: 10px;
+      right: 20px;
+      background: #eee;
+      padding: 5px 10px;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      user-select: none;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<div class="language-toggle" id="langToggle">
+  <span id="langName">Eng</span>
+</div>
+
+<div class="container">
+  <h1 id="title">Flashcard 📝</h1>
+  <input type="file" id="zipFile" accept=".zip"><br><br>
+
+  <div id="questionBox">Upload a ZIP to Start!</div>
+  <div id="answerBox"></div>
+
+  <button id="showAnswer" class="show">Show Answer</button>
+  <button id="easy" class="easy">Easy</button>
+  <button id="hard" class="hard">Hard</button>
+
+  <div class="progress" id="progress"></div>
+  <div class="timer" id="timer">Elapsed Time: 00:00</div>
+</div>
+
+<script>
+  let questions = [], answers = [], index = 0, hardList = [];
+  let originalPairs = [];
+  let startTime, timerInterval;
+  let currentLang = "Eng"; // Default English
+
+  const texts = {
+    Eng: {
+      title: "Flashcard 📝",
+      upload: "Upload a ZIP to Start!",
+      showAnswer: "Show Answer",
+      easy: "Easy",
+      hard: "Hard",
+      elapsed: "Elapsed Time: 00:00",
+      progress: "Progress",
+      revising: "Now revising Hard questions!",
+      finished: "All questions completed! Restart session?",
+    },
+    Xan: {
+      title: "Flashcard Qana 📝",
+      upload: "Ehoṕ lagit ZIP file upload me!",
+      showAnswer: "Jobab Ñelme",
+      easy: "Alga",
+      hard: "Haron",
+      elapsed: "Parom aqan Somoy : 00:00",
+      progress: "Lahanti",
+      revising: "Ñitoq haronaq qukli Ñelme!",
+      finished: "Joto qukli cabaina. Cheq arhoem ehoṕa?",
+    }
+  };
+
+  const qBox = document.getElementById('questionBox');
+  const aBox = document.getElementById('answerBox');
+  const showBtn = document.getElementById('showAnswer');
+  const easyBtn = document.getElementById('easy');
+  const hardBtn = document.getElementById('hard');
+  const progress = document.getElementById('progress');
+  const timerDisplay = document.getElementById('timer');
+  const title = document.getElementById('title');
+  const langName = document.getElementById('langName');
+  const toggle = document.getElementById('langToggle');
+
+  function startTimer() {
+    startTime = Date.now();
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const minutes = Math.floor(elapsed / 60000);
+      const seconds = Math.floor((elapsed % 60000) / 1000);
+      timerDisplay.textContent = (currentLang === "Eng" ? "Elapsed Time" : "Parom aqan Somoy") + `: ${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+    }, 1000);
+  }
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
+
+  function updateProgress() {
+    progress.textContent = `${texts[currentLang].progress}: ${index + 1} / ${questions.length}`;
+  }
+
+  function showQuestion() {
+    if (index >= questions.length) {
+      if (hardList.length > 0) {
+        questions = hardList.map(p => p.question);
+        answers = hardList.map(p => p.answer);
+        hardList = [];
+        index = 0;
+        alert(texts[currentLang].revising);
+        startTimer();
+        showQuestion();
+      } else {
+        clearInterval(timerInterval);
+        if (confirm(texts[currentLang].finished)) {
+          restartSession();
+        }
+        return;
+      }
+    }
+    qBox.textContent = questions[index];
+    aBox.style.display = 'none';
+    aBox.textContent = "Answer: " + answers[index];
+    updateProgress();
+  }
+
+  function restartSession() {
+    const pairs = [...originalPairs];
+    shuffle(pairs);
+    questions = pairs.map(p => p.question);
+    answers = pairs.map(p => p.answer);
+    index = 0;
+    hardList = [];
+    startTimer();
+    showQuestion();
+  }
+
+  showBtn.onclick = () => {
+    aBox.style.display = 'block';
+  };
+
+  easyBtn.onclick = () => {
+    index++;
+    showQuestion();
+  };
+
+  hardBtn.onclick = () => {
+    hardList.push({ question: questions[index], answer: answers[index] });
+    index++;
+    showQuestion();
+  };
+
+  document.getElementById('zipFile').addEventListener('change', async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const zip = await JSZip.loadAsync(file);
+    const qText = await zip.file("questions.txt").async("string");
+    const aText = await zip.file("answers.txt").async("string");
+
+    const qArray = qText.trim().split("\n");
+    const aArray = aText.trim().split("\n");
+
+    const pairs = qArray.map((q, i) => ({ question: q, answer: aArray[i] }));
+
+    shuffle(pairs);
+    originalPairs = [...pairs];
+
+    questions = pairs.map(p => p.question);
+    answers = pairs.map(p => p.answer);
+
+    index = 0;
+    startTimer();
+    showQuestion();
+  });
+
+  toggle.onclick = function() {
+    currentLang = (currentLang === "Eng") ? "Xan" : "Eng";
+    langName.textContent = currentLang;
+    title.textContent = texts[currentLang].title;
+    showBtn.textContent = texts[currentLang].showAnswer;
+    easyBtn.textContent = texts[currentLang].easy;
+    hardBtn.textContent = texts[currentLang].hard;
+    if (index === 0 && !questions.length) {
+      qBox.textContent = texts[currentLang].upload;
+    }
+    updateProgress();
+  };
+</script>
+
+</body>
+</html>
